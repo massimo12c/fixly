@@ -5,11 +5,11 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
 void main() {
-  runApp(const BollettaApp());
+  runApp(const BollettaCheckApp());
 }
 
-class BollettaApp extends StatelessWidget {
-  const BollettaApp({super.key});
+class BollettaCheckApp extends StatelessWidget {
+  const BollettaCheckApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -21,6 +21,12 @@ class BollettaApp extends StatelessWidget {
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
         scaffoldBackgroundColor: const Color(0xFFF6F7FB),
+        cardTheme: CardThemeData(
+          elevation: 0,
+          color: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          margin: EdgeInsets.zero,
+        ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: const Color(0xFFF2F4F7),
@@ -38,12 +44,6 @@ class BollettaApp extends StatelessWidget {
           ),
           contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         ),
-        cardTheme: CardThemeData(
-          elevation: 0,
-          color: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-          margin: EdgeInsets.zero,
-        ),
       ),
       home: const HomePage(),
     );
@@ -57,14 +57,17 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  // Input
   final _ultima = TextEditingController();
   final _media = TextEditingController();
   final _azienda = TextEditingController();
   final _codice = TextEditingController();
   final _nome = TextEditingController();
-  final _emailPec = TextEditingController();
+  final _pec = TextEditingController();
+  final _citta = TextEditingController();
 
-  String risultato = "";
+  // Output
+  String reclamo = '';
   bool anomalia = false;
   double? diffPerc;
 
@@ -75,111 +78,180 @@ class _HomePageState extends State<HomePage> {
     _azienda.dispose();
     _codice.dispose();
     _nome.dispose();
-    _emailPec.dispose();
+    _pec.dispose();
+    _citta.dispose();
     super.dispose();
   }
 
   double _parseEuro(String s) {
-    final cleaned = s.trim().replaceAll('€', '').replaceAll(' ', '').replaceAll(',', '.');
+    final cleaned = s
+        .trim()
+        .replaceAll('€', '')
+        .replaceAll(' ', '')
+        .replaceAll('.', '')
+        .replaceAll(',', '.');
     return double.tryParse(cleaned) ?? 0;
   }
 
-  void calcola() {
+  String _fmtDate(DateTime d) {
+    final dd = d.day.toString().padLeft(2, '0');
+    final mm = d.month.toString().padLeft(2, '0');
+    final yy = d.year.toString();
+    return '$dd/$mm/$yy';
+  }
+
+  // ✅ NUOVO: svuota tutti i campi e resetta risultato
+  void _nuovo() {
+    setState(() {
+      _ultima.clear();
+      _media.clear();
+      _azienda.clear();
+      _codice.clear();
+      _nome.clear();
+      _pec.clear();
+      _citta.clear();
+
+      reclamo = '';
+      anomalia = false;
+      diffPerc = null;
+    });
+  }
+
+  void _generaReclamo() {
     final ultima = _parseEuro(_ultima.text);
     final media = _parseEuro(_media.text);
 
-    if (media <= 0 || ultima <= 0) {
+    if (ultima <= 0 || media <= 0) {
       setState(() {
+        reclamo = 'Inserisci importi validi (ultima bolletta e media).';
         anomalia = false;
         diffPerc = null;
-        risultato = "Inserisci importi validi (ultima bolletta e media).";
       });
       return;
     }
 
     final diff = ((ultima - media) / media) * 100;
     diffPerc = diff;
+    anomalia = diff > 20.0;
 
-    final soglia = 20.0;
-    anomalia = diff > soglia;
-
-    if (!anomalia) {
-      setState(() {
-        risultato =
-            "Nessuna anomalia significativa rilevata (${diff.toStringAsFixed(1)}%).\n"
-            "Se pensi comunque ci sia un errore, puoi scrivere un reclamo indicando i dettagli.";
-      });
-      return;
-    }
-
-    final azienda = _azienda.text.trim().isEmpty ? "________" : _azienda.text.trim();
-    final nome = _nome.text.trim().isEmpty ? "________" : _nome.text.trim();
-    final codice = _codice.text.trim().isEmpty ? "________" : _codice.text.trim();
-    final pec = _emailPec.text.trim().isEmpty ? "________" : _emailPec.text.trim();
+    final azienda = _azienda.text.trim().isEmpty ? '________' : _azienda.text.trim();
+    final nome = _nome.text.trim().isEmpty ? '________' : _nome.text.trim();
+    final codice = _codice.text.trim().isEmpty ? '________' : _codice.text.trim();
+    final pec = _pec.text.trim().isEmpty ? '________' : _pec.text.trim();
+    final citta = _citta.text.trim().isEmpty ? '________' : _citta.text.trim();
+    final data = _fmtDate(DateTime.now());
 
     final ultimaTxt = _ultima.text.trim().isEmpty ? ultima.toStringAsFixed(2) : _ultima.text.trim();
     final mediaTxt = _media.text.trim().isEmpty ? media.toStringAsFixed(2) : _media.text.trim();
 
-    final now = DateTime.now();
-    final dd = now.day.toString().padLeft(2, '0');
-    final mm = now.month.toString().padLeft(2, '0');
-    final yyyy = now.year.toString();
-    final data = "$dd/$mm/$yyyy";
+    if (!anomalia) {
+      setState(() {
+        reclamo =
+            'Esito: nessuna anomalia significativa (${diff.toStringAsFixed(1)}%).\n\n'
+            'Se vuoi comunque procedere, puoi inviare un reclamo indicando i dettagli e chiedendo verifica/trasparenza.\n'
+            'Suggerimento: prova a inserire valori reali e premi di nuovo.';
+      });
+      return;
+    }
 
     setState(() {
-      risultato = """
-Oggetto: Reclamo per importo anomalo bolletta – richiesta verifica e rettifica
+      reclamo = '''
+Oggetto: Reclamo formale per importo anomalo bolletta – richiesta verifica e rettifica
 
 Spett.le $azienda,
 
-Il/La sottoscritto/a $nome (codice cliente: $codice), con la presente segnala un importo anomalo nell’ultima bolletta pari a €$ultimaTxt, rispetto alla media delle bollette precedenti pari a €$mediaTxt (variazione: +${diff.toStringAsFixed(1)}%).
+il/la sottoscritto/a $nome (codice cliente/POD/PDR: $codice) segnala un importo anomalo nell’ultima bolletta pari a €$ultimaTxt, rispetto alla media delle bollette precedenti pari a €$mediaTxt (variazione: +${diff.toStringAsFixed(1)}%).
 
-Si richiede:
-1) verifica dettagliata dei consumi e dei criteri di fatturazione;
-2) rettifica dell’importo e storno di eventuali addebiti non dovuti;
+Con la presente si richiede:
+1) verifica dettagliata dei consumi e dei criteri di fatturazione/calcolo;
+2) rettifica dell’importo e storno/rimborso di eventuali addebiti non dovuti;
 3) riscontro scritto entro i termini previsti.
 
-Recapito PEC (per risposta): $pec
+Recapito PEC per risposta (se disponibile): $pec
 
-Luogo e data: $data
+In difetto di riscontro, ci si riserva di attivare le procedure di conciliazione previste.
+
+$citta, $data
 
 Cordiali saluti
 $nome
-""".trim();
+'''.trim();
     });
   }
 
-  Future<void> scaricaPdf() async {
-    if (risultato.trim().isEmpty) return;
+  Future<void> _copiaReclamo() async {
+    if (reclamo.trim().isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: reclamo));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reclamo copiato')));
+  }
+
+  Future<void> _scaricaPdfPec() async {
+    if (reclamo.trim().isEmpty || !anomalia) return;
 
     final doc = pw.Document();
 
+    final azienda = _azienda.text.trim().isEmpty ? '________' : _azienda.text.trim();
+    final nome = _nome.text.trim().isEmpty ? '________' : _nome.text.trim();
+    final codice = _codice.text.trim().isEmpty ? '________' : _codice.text.trim();
+    final pec = _pec.text.trim().isEmpty ? '________' : _pec.text.trim();
+    final citta = _citta.text.trim().isEmpty ? '________' : _citta.text.trim();
+    final data = _fmtDate(DateTime.now());
+    final perc = diffPerc == null ? '—' : '+${diffPerc!.toStringAsFixed(1)}%';
+
     doc.addPage(
       pw.Page(
-        margin: const pw.EdgeInsets.all(32),
+        margin: const pw.EdgeInsets.all(40),
         build: (_) {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
               pw.Text(
-                'RECLAMO PRONTO PER PEC',
-                style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
+                'RECLAMO FORMALE – PRONTO PER PEC',
+                style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
+              ),
+              pw.SizedBox(height: 6),
+              pw.Text('Esito: possibile anomalia ($perc)', style: const pw.TextStyle(fontSize: 10)),
+              pw.SizedBox(height: 18),
+
+              pw.Text('Destinatario:', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+              pw.Text('Spett.le $azienda', style: const pw.TextStyle(fontSize: 11)),
+              pw.SizedBox(height: 12),
+
+              pw.Text('Dati del cliente:', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+              pw.Text('Nome e cognome: $nome', style: const pw.TextStyle(fontSize: 11)),
+              pw.Text('Codice cliente / POD / PDR: $codice', style: const pw.TextStyle(fontSize: 11)),
+              pw.Text('PEC per risposta (se disponibile): $pec', style: const pw.TextStyle(fontSize: 11)),
+              pw.SizedBox(height: 16),
+
+              pw.Text(
+                'Oggetto: Reclamo formale per importo anomalo bolletta – richiesta verifica e rettifica',
+                style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
               ),
               pw.SizedBox(height: 10),
-              if (anomalia && diffPerc != null)
-                pw.Text(
-                  'Esito: possibile anomalia (+${diffPerc!.toStringAsFixed(1)}%)',
-                  style: pw.TextStyle(fontSize: 11),
-                ),
-              pw.SizedBox(height: 18),
-              pw.Text(risultato, style: const pw.TextStyle(fontSize: 12)),
+
+              pw.Text(
+                reclamo,
+                style: const pw.TextStyle(fontSize: 11),
+              ),
+
               pw.SizedBox(height: 18),
               pw.Divider(),
               pw.SizedBox(height: 8),
+
               pw.Text(
-                'Suggerimento: allega la bolletta (PDF) e indica eventuale POD/PDR o numero fornitura.',
-                style: pw.TextStyle(fontSize: 10),
+                'Allegati consigliati:',
+                style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
               ),
+              pw.Bullet(text: 'Copia bolletta contestata (PDF).'),
+              pw.Bullet(text: 'Eventuale documento d’identità (se richiesto dall’azienda).'),
+              pw.Bullet(text: 'Eventuali letture/consumi e comunicazioni precedenti.'),
+
+              pw.SizedBox(height: 18),
+              pw.Text('Luogo e data: $citta, $data', style: const pw.TextStyle(fontSize: 10)),
+              pw.SizedBox(height: 10),
+              pw.Text('Firma: __________________________', style: const pw.TextStyle(fontSize: 10)),
+              pw.Text(nome, style: const pw.TextStyle(fontSize: 10)),
             ],
           );
         },
@@ -191,7 +263,7 @@ $nome
 
   @override
   Widget build(BuildContext context) {
-    final canPdf = risultato.trim().isNotEmpty && anomalia;
+    final canPdf = anomalia && reclamo.trim().isNotEmpty;
 
     return Scaffold(
       appBar: AppBar(
@@ -199,23 +271,14 @@ $nome
         actions: [
           IconButton(
             tooltip: 'Copia reclamo',
-            onPressed: risultato.trim().isEmpty
-                ? null
-                : () async {
-                    await Clipboard.setData(ClipboardData(text: risultato));
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Reclamo copiato')),
-                      );
-                    }
-                  },
+            onPressed: reclamo.trim().isEmpty ? null : _copiaReclamo,
             icon: const Icon(Icons.copy_rounded),
           ),
         ],
       ),
       body: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 920),
+          constraints: const BoxConstraints(maxWidth: 980),
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Card(
@@ -223,42 +286,44 @@ $nome
                 padding: const EdgeInsets.all(16),
                 child: ListView(
                   children: [
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     const Text(
-                      "Ti hanno gonfiato la bolletta?",
+                      'Ti hanno gonfiato la bolletta?',
                       style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900),
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      "Inserisci gli importi: se è anomala, generi il reclamo pronto per PEC in 30 secondi.",
+                      'Inserisci gli importi: se è anomala, generi il reclamo formale e il PDF pronto per PEC.',
                       style: TextStyle(fontSize: 16, color: Color(0xFF667085)),
                     ),
                     const SizedBox(height: 18),
+
                     Row(
                       children: [
                         Expanded(
                           child: TextField(
                             controller: _ultima,
+                            keyboardType: TextInputType.number,
                             decoration: const InputDecoration(
-                              labelText: "Ultima bolletta (€)",
+                              labelText: 'Ultima bolletta (€)',
                               prefixIcon: Icon(Icons.receipt_long_rounded),
                             ),
-                            keyboardType: TextInputType.number,
                           ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: TextField(
                             controller: _media,
+                            keyboardType: TextInputType.number,
                             decoration: const InputDecoration(
-                              labelText: "Media bollette precedenti (€)",
+                              labelText: 'Media bollette precedenti (€)',
                               prefixIcon: Icon(Icons.query_stats_rounded),
                             ),
-                            keyboardType: TextInputType.number,
                           ),
                         ),
                       ],
                     ),
+
                     const SizedBox(height: 12),
                     Row(
                       children: [
@@ -266,7 +331,7 @@ $nome
                           child: TextField(
                             controller: _azienda,
                             decoration: const InputDecoration(
-                              labelText: "Azienda (es. Enel Energia)",
+                              labelText: 'Azienda (es. Enel Energia)',
                               prefixIcon: Icon(Icons.business_rounded),
                             ),
                           ),
@@ -276,13 +341,14 @@ $nome
                           child: TextField(
                             controller: _codice,
                             decoration: const InputDecoration(
-                              labelText: "Codice cliente / POD / PDR (se lo hai)",
+                              labelText: 'Codice cliente / POD / PDR',
                               prefixIcon: Icon(Icons.badge_rounded),
                             ),
                           ),
                         ),
                       ],
                     ),
+
                     const SizedBox(height: 12),
                     Row(
                       children: [
@@ -290,7 +356,7 @@ $nome
                           child: TextField(
                             controller: _nome,
                             decoration: const InputDecoration(
-                              labelText: "Nome e cognome",
+                              labelText: 'Nome e cognome',
                               prefixIcon: Icon(Icons.person_rounded),
                             ),
                           ),
@@ -298,27 +364,47 @@ $nome
                         const SizedBox(width: 12),
                         Expanded(
                           child: TextField(
-                            controller: _emailPec,
+                            controller: _pec,
                             decoration: const InputDecoration(
-                              labelText: "Tua PEC (per risposta, opzionale)",
+                              labelText: 'Tua PEC (opzionale)',
                               prefixIcon: Icon(Icons.alternate_email_rounded),
                             ),
                           ),
                         ),
                       ],
                     ),
+
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _citta,
+                      decoration: const InputDecoration(
+                        labelText: 'Città (per firma, opzionale)',
+                        prefixIcon: Icon(Icons.location_on_rounded),
+                      ),
+                    ),
+
                     const SizedBox(height: 16),
+
+                    // ✅ QUI HO INSERITO "NUOVO" (riga nuova)
+                    OutlinedButton.icon(
+                      onPressed: _nuovo,
+                      icon: const Icon(Icons.add_rounded),
+                      label: const Text('Nuovo'),
+                    ),
+
+                    const SizedBox(height: 10),
                     FilledButton.icon(
-                      onPressed: calcola,
+                      onPressed: _generaReclamo,
                       icon: const Icon(Icons.auto_fix_high_rounded),
-                      label: const Text("Verifica e genera reclamo"),
+                      label: const Text('Verifica e genera reclamo'),
                     ),
                     const SizedBox(height: 10),
                     FilledButton.tonalIcon(
-                      onPressed: canPdf ? scaricaPdf : null,
+                      onPressed: canPdf ? _scaricaPdfPec : null,
                       icon: const Icon(Icons.picture_as_pdf_rounded),
-                      label: const Text("Scarica PDF pronto per PEC"),
+                      label: const Text('Scarica PDF pronto per PEC'),
                     ),
+
                     const SizedBox(height: 16),
                     Container(
                       padding: const EdgeInsets.all(14),
@@ -328,9 +414,9 @@ $nome
                         border: Border.all(color: const Color(0xFFEAECF0)),
                       ),
                       child: SelectableText(
-                        risultato.trim().isEmpty
-                            ? "Qui apparirà il reclamo. Compila i campi e premi “Verifica e genera reclamo”."
-                            : risultato,
+                        reclamo.trim().isEmpty
+                            ? 'Qui apparirà il reclamo. Compila i campi e premi “Verifica e genera reclamo”.'
+                            : reclamo,
                         style: const TextStyle(height: 1.35),
                       ),
                     ),
