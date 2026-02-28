@@ -1,5 +1,5 @@
-name: risolvi_tim
-description: Fixly - gestione pratiche e reclami
+name: fixly
+description: Bolletta Check - reclamo pronto PEC
 publish_to: "none"
 
 version: 1.0.0+1
@@ -12,16 +12,8 @@ dependencies:
     sdk: flutter
 
   cupertino_icons: ^1.0.8
-  shared_preferences: ^2.3.2
-  flutter_local_notifications: ^18.0.1
-  timezone: ^0.9.4
   pdf: ^3.10.8
   printing: ^5.12.0
-
-  cupertino_icons: ^1.0.8
-  shared_preferences: ^2.3.2
-  flutter_local_notifications: ^18.0.1
-  timezone: ^0.9.4
 
 dev_dependencies:
   flutter_test:
